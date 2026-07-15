@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, limit, getDocs, getDoc, doc, where } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, getDoc, doc, where, Timestamp } from "firebase/firestore";
 import { Trophy, Medal, Award, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
@@ -77,31 +77,11 @@ export default function Leaderboard() {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        const usersRef = collection(db, "users");
-        let q;
-        
-        if (selectedGroup === "global") {
-          q = query(
-            usersRef,
-            orderBy(timeframe === "weekly" ? "weeklyPoints" : "allTimePoints", "desc"),
-            limit(50)
-          );
+        if (timeframe === "weekly") {
+          await fetchWeeklyLeaderboard();
         } else {
-          // Requires a composite index for groups array-contains + orderBy
-          q = query(
-            usersRef,
-            where("groups", "array-contains", selectedGroup),
-            orderBy(timeframe === "weekly" ? "weeklyPoints" : "allTimePoints", "desc"),
-            limit(50)
-          );
+          await fetchAllTimeLeaderboard();
         }
-
-        const snapshot = await getDocs(q);
-        const fetchedUsers: LeaderboardUser[] = [];
-        snapshot.forEach((doc) => {
-          fetchedUsers.push(doc.data() as LeaderboardUser);
-        });
-        setUsers(fetchedUsers);
       } catch (error: any) {
         console.error("Error fetching leaderboard:", error);
         if (error.message && error.message.includes("requires an index")) {
@@ -114,6 +94,101 @@ export default function Leaderboard() {
 
     fetchLeaderboard();
   }, [timeframe, selectedGroup]);
+
+  /**
+   * Compute weekly points on-the-fly from submissions.
+   * This avoids the stale `weeklyPoints` counter issue.
+   */
+  const fetchWeeklyLeaderboard = async () => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
+    // Query all submissions within the current week
+    const submissionsRef = collection(db, "submissions");
+    const subQuery = query(
+      submissionsRef,
+      where("timestamp", ">=", Timestamp.fromDate(weekStart)),
+      where("timestamp", "<=", Timestamp.fromDate(weekEnd))
+    );
+
+    const subSnapshot = await getDocs(subQuery);
+
+    // Group submissions by userId and sum pointsEarned
+    const pointsByUser = new Map<string, number>();
+    subSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const userId = data.userId as string;
+      const points = (data.pointsEarned as number) || 0;
+      pointsByUser.set(userId, (pointsByUser.get(userId) || 0) + points);
+    });
+
+    // Fetch user profiles for all users who have submissions
+    // Also fetch all users to include those with 0 points
+    const usersRef = collection(db, "users");
+    let usersQuery;
+
+    if (selectedGroup === "global") {
+      usersQuery = query(usersRef);
+    } else {
+      usersQuery = query(
+        usersRef,
+        where("groups", "array-contains", selectedGroup)
+      );
+    }
+
+    const usersSnapshot = await getDocs(usersQuery);
+    const fetchedUsers: LeaderboardUser[] = [];
+
+    usersSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const uid = data.uid || doc.id;
+      fetchedUsers.push({
+        uid,
+        displayName: data.displayName || "Anonymous",
+        photoURL: data.photoURL || "",
+        weeklyPoints: pointsByUser.get(uid) || 0,
+        allTimePoints: data.allTimePoints || 0,
+        currentStreak: data.currentStreak || 0,
+      });
+    });
+
+    // Sort by weekly points descending
+    fetchedUsers.sort((a, b) => b.weeklyPoints - a.weeklyPoints);
+
+    // Limit to top 50
+    setUsers(fetchedUsers.slice(0, 50));
+  };
+
+  /**
+   * All-time leaderboard still uses the counter field on user docs.
+   */
+  const fetchAllTimeLeaderboard = async () => {
+    const usersRef = collection(db, "users");
+    let q;
+
+    if (selectedGroup === "global") {
+      q = query(
+        usersRef,
+        orderBy("allTimePoints", "desc"),
+        limit(50)
+      );
+    } else {
+      q = query(
+        usersRef,
+        where("groups", "array-contains", selectedGroup),
+        orderBy("allTimePoints", "desc"),
+        limit(50)
+      );
+    }
+
+    const snapshot = await getDocs(q);
+    const fetchedUsers: LeaderboardUser[] = [];
+    snapshot.forEach((doc) => {
+      fetchedUsers.push(doc.data() as LeaderboardUser);
+    });
+    setUsers(fetchedUsers);
+  };
 
   return (
     <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-4xl mx-auto w-full">

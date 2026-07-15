@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { startOfWeek, endOfWeek } from "date-fns";
 import SubmissionForm from "./SubmissionForm";
 import Leaderboard from "./Leaderboard";
 import SubmissionHistory from "./SubmissionHistory";
@@ -14,6 +16,35 @@ import { LogOut, LayoutDashboard, Trophy, History, Users } from "lucide-react";
 export default function Dashboard() {
   const { user, userData } = useAuth();
   const [activeTab, setActiveTab] = useState<"dashboard" | "leaderboard" | "history" | "groups">("dashboard");
+  const [computedWeeklyPoints, setComputedWeeklyPoints] = useState<number | null>(null);
+
+  // Compute weekly points from actual submissions
+  useEffect(() => {
+    const computeWeeklyPoints = async () => {
+      if (!user) return;
+
+      const now = new Date();
+      const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
+      const submissionsRef = collection(db, "submissions");
+      const q = query(
+        submissionsRef,
+        where("userId", "==", user.uid),
+        where("timestamp", ">=", Timestamp.fromDate(weekStart)),
+        where("timestamp", "<=", Timestamp.fromDate(weekEnd))
+      );
+
+      const snapshot = await getDocs(q);
+      let total = 0;
+      snapshot.forEach((doc) => {
+        total += (doc.data().pointsEarned as number) || 0;
+      });
+      setComputedWeeklyPoints(total);
+    };
+
+    computeWeeklyPoints();
+  }, [user, activeTab]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -105,7 +136,7 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold text-white mb-5">Your Stats</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                    <div className="text-3xl font-bold text-emerald-400">{userData?.weeklyPoints || 0}</div>
+                    <div className="text-3xl font-bold text-emerald-400">{computedWeeklyPoints ?? userData?.weeklyPoints ?? 0}</div>
                     <div className="text-xs text-white/50 mt-1 uppercase tracking-wider">Weekly Points</div>
                   </div>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/5">
