@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -8,9 +8,12 @@ import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { Loader2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function JoinGroupPage({ params }: { params: { groupId: string } }) {
+export default function JoinGroupPage({ params }: { params: Promise<{ groupId: string }> }) {
   const { user, userData, loading: authLoading } = useAuth();
   const router = useRouter();
+  const unwrappedParams = use(params);
+  const groupId = unwrappedParams.groupId;
+  
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<{ id: string; name: string } | null>(null);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
@@ -19,7 +22,7 @@ export default function JoinGroupPage({ params }: { params: { groupId: string } 
   useEffect(() => {
     const fetchGroup = async () => {
       try {
-        const gDoc = await getDoc(doc(db, "groups", params.groupId));
+        const gDoc = await getDoc(doc(db, "groups", groupId));
         if (gDoc.exists()) {
           setGroup({ id: gDoc.id, name: gDoc.data().name });
         } else {
@@ -33,7 +36,7 @@ export default function JoinGroupPage({ params }: { params: { groupId: string } 
       }
     };
     fetchGroup();
-  }, [params.groupId]);
+  }, [groupId]);
 
   const handleJoin = async () => {
     if (!user || !userData || !group) return;
