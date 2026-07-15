@@ -4,13 +4,31 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { Users, Plus, Mail, Check, X, Loader2 } from "lucide-react";
+import { Users, Plus, Mail, Check, X, Loader2, User as UserIcon, Crown } from "lucide-react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Group {
   id: string;
   name: string;
   members: string[];
+  ownerId?: string;
 }
 
 interface Invite {
@@ -32,6 +50,11 @@ export default function GroupsPanel() {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+  // View Members state
+  const [viewingGroup, setViewingGroup] = useState<Group | null>(null);
+  const [groupMembers, setGroupMembers] = useState<{uid: string, displayName: string}[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -183,7 +206,6 @@ export default function GroupsPanel() {
 
   const handleLeaveGroup = async (groupId: string) => {
     if (!user || !userData) return;
-    if (!confirm("Are you sure you want to leave this group?")) return;
     
     setActionLoading(true);
     try {
@@ -227,6 +249,52 @@ export default function GroupsPanel() {
       setMessage({ type: 'error', text: 'Failed to rename group.' });
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handlePromoteLeader = async (groupId: string, newOwnerId: string) => {
+    if (!user || !userData) return;
+    setActionLoading(true);
+    try {
+      await updateDoc(doc(db, "groups", groupId), {
+        ownerId: newOwnerId
+      });
+      setMessage({ type: 'success', text: 'Promoted to leader successfully.' });
+      
+      if (viewingGroup && viewingGroup.id === groupId) {
+        setViewingGroup({ ...viewingGroup, ownerId: newOwnerId });
+      }
+      
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: 'Failed to promote leader.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleViewGroup = async (group: Group) => {
+    setViewingGroup(group);
+    setLoadingMembers(true);
+    setGroupMembers([]);
+    try {
+      const membersData = [];
+      const memberIds = group.members || [];
+      // Fetch users one by one (could use 'in' query if <= 10, but this handles >10)
+      for (const uid of memberIds) {
+        const uDoc = await getDoc(doc(db, "users", uid));
+        if (uDoc.exists()) {
+          membersData.push({ uid, displayName: uDoc.data().displayName || "Unknown User" });
+        } else {
+          membersData.push({ uid, displayName: "Unknown User" });
+        }
+      }
+      setGroupMembers(membersData);
+    } catch (err) {
+      console.error("Failed to load members:", err);
+    } finally {
+      setLoadingMembers(false);
     }
   };
 
@@ -379,11 +447,17 @@ export default function GroupsPanel() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white font-medium">{group.name}</span>
-                      <span className="text-white/40 text-xs bg-white/5 px-2 py-1 rounded-md">{group.members.length} members</span>
-                      <button
-                        onClick={() => {
+                    <div 
+                      className="flex items-center gap-3 cursor-pointer group/name flex-1"
+                      onClick={() => handleViewGroup(group)}
+                    >
+                      <span className="text-white font-medium group-hover/name:text-emerald-400 transition-colors">{group.name}</span>
+                      <span className="text-white/40 text-xs bg-white/5 px-2 py-1 rounded-md group-hover/name:bg-emerald-500/10 group-hover/name:text-emerald-400 transition-colors">
+                        {group.members?.length === 1 ? '1 member' : `${group.members?.length || 0} members`}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
                           setEditingGroupId(group.id);
                           setEditGroupName(group.name);
                         }}
@@ -392,7 +466,6 @@ export default function GroupsPanel() {
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       </button>
-                    </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => handleCopyLink(group.id)}
@@ -401,12 +474,30 @@ export default function GroupsPanel() {
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                         Copy Link
                       </button>
-                      <button
-                        onClick={() => handleLeaveGroup(group.id)}
-                        className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-md text-sm font-medium transition"
-                      >
-                        Leave Group
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-md text-sm font-medium transition"
+                        >
+                          Leave Group
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-neutral-900 border border-white/10 text-white rounded-xl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-white/60">
+                              You will be removed from this group. You will need a new invite to join again.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-white/10 hover:bg-white/20 hover:text-white border-transparent text-white">Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleLeaveGroup(group.id)}
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              Leave Group
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </>
                 )}
@@ -426,6 +517,53 @@ export default function GroupsPanel() {
       )}
       </div>
 
+      {/* Members Dialog */}
+      <Dialog open={!!viewingGroup} onOpenChange={(open) => !open && setViewingGroup(null)}>
+        <DialogContent className="bg-neutral-900 border-white/10 text-white rounded-xl">
+          <DialogHeader>
+            <DialogTitle>{viewingGroup?.name} Members</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-4 max-h-[60vh] overflow-y-auto">
+            {loadingMembers ? (
+              <div className="text-center text-white/50 py-4 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin" /> Loading members...
+              </div>
+            ) : groupMembers.length === 0 ? (
+              <div className="text-center text-white/50 py-4">No members found.</div>
+            ) : (
+              groupMembers.map(member => (
+                <div key={member.uid} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                      <UserIcon size={16} />
+                    </div>
+                    <span className="font-medium text-white/90 flex items-center gap-2">
+                      {member.displayName}
+                      {member.uid === viewingGroup?.ownerId && (
+                        <div className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">
+                          <Crown size={12} />
+                          Leader
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                  
+                  {user?.uid === viewingGroup?.ownerId && member.uid !== viewingGroup?.ownerId && (
+                    <button 
+                      onClick={() => handlePromoteLeader(viewingGroup!.id, member.uid)}
+                      disabled={actionLoading}
+                      className="text-xs px-2.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 rounded-md transition disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Crown size={12} />
+                      Promote
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

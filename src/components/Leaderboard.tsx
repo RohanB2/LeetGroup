@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, getDocs, getDoc, doc, where } from "firebase/firestore";
 import { Trophy, Medal, Award, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, startOfWeek, endOfWeek, formatDistanceToNowStrict } from "date-fns";
+import SubmissionHistory from "./SubmissionHistory";
 
 interface LeaderboardUser {
   uid: string;
@@ -31,6 +33,7 @@ export default function Leaderboard() {
   const [availableGroups, setAvailableGroups] = useState<Group[]>([{ id: "global", name: "Global Leaderboard" }]);
   const [timeLeft, setTimeLeft] = useState("");
   const [weekRange, setWeekRange] = useState({ start: "", end: "" });
+  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
 
   // Timer logic
   useEffect(() => {
@@ -196,9 +199,10 @@ export default function Leaderboard() {
           {users.map((u, index) => (
             <div
               key={u.uid}
-              className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
+              onClick={() => setSelectedUser(u)}
+              className={`flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer ${
                 index < 3
-                  ? 'bg-white/5 border-white/10 hover:bg-white/8'
+                  ? 'bg-white/5 border-white/10 hover:bg-white/10'
                   : 'bg-transparent border-transparent hover:bg-white/5'
               }`}
             >
@@ -210,7 +214,7 @@ export default function Leaderboard() {
                   {index > 2 && <span className="text-white/30 text-lg">{index + 1}</span>}
                 </div>
                 <img
-                  src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}&background=198a48&color=fff`}
+                  src={u.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName)}&background=198a48&color=fff`}
                   alt={u.displayName}
                   className="w-10 h-10 rounded-full ring-2 ring-white/10"
                 />
@@ -231,6 +235,18 @@ export default function Leaderboard() {
           ))}
         </div>
       )}
+
+      {/* User History Modal */}
+      <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent className="bg-neutral-900 border-white/10 text-white rounded-2xl sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedUser?.displayName}&apos;s History</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <SubmissionHistory targetUserId={selectedUser.uid} targetUserName={selectedUser.displayName} isModal={true} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

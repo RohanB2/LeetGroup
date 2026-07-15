@@ -27,20 +27,19 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      // Anyone logged in can read groups
-      allow read: if isAuthenticated();
+      // Anyone can read groups (needed so unauthenticated users can preview invite links)
+      allow read: if true;
       // Anyone logged in can create a group
       allow create: if isAuthenticated();
       // Only people can update the group (e.g. to join/leave/rename)
-      // Ideally, only members or owners could rename, but for a small group of friends, this is sufficient.
       allow update: if isAuthenticated();
       allow delete: if false; // Don't allow deletion from client to be safe
     }
 
     match /invites/{inviteId} {
-      allow read: if isAuthenticated() && (resource.data.toEmail == request.auth.token.email || resource.data.fromUserId == request.auth.uid);
+      allow read: if isAuthenticated() && (resource.data.toUserEmail == request.auth.token.email || resource.data.fromUserId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.fromUserId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.toEmail == request.auth.token.email || resource.data.fromUserId == request.auth.uid);
+      allow update, delete: if isAuthenticated() && (resource.data.toUserEmail == request.auth.token.email || resource.data.fromUserId == request.auth.uid);
     }
 
     match /weekly_results/{resultId} {
