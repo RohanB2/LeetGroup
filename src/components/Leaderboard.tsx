@@ -161,33 +161,57 @@ export default function Leaderboard() {
   };
 
   /**
-   * All-time leaderboard still uses the counter field on user docs.
+   * Compute all-time points on-the-fly from submissions to ensure accuracy.
    */
   const fetchAllTimeLeaderboard = async () => {
+    // Query all submissions
+    const submissionsRef = collection(db, "submissions");
+    const subQuery = query(submissionsRef);
+    const subSnapshot = await getDocs(subQuery);
+
+    // Group submissions by userId and sum pointsEarned
+    const pointsByUser = new Map<string, number>();
+    subSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const userId = data.userId as string;
+      const points = (data.pointsEarned as number) || 0;
+      pointsByUser.set(userId, (pointsByUser.get(userId) || 0) + points);
+    });
+
+    // Fetch user profiles
     const usersRef = collection(db, "users");
-    let q;
+    let usersQuery;
 
     if (selectedGroup === "global") {
-      q = query(
-        usersRef,
-        orderBy("allTimePoints", "desc"),
-        limit(50)
-      );
+      usersQuery = query(usersRef);
     } else {
-      q = query(
+      usersQuery = query(
         usersRef,
-        where("groups", "array-contains", selectedGroup),
-        orderBy("allTimePoints", "desc"),
-        limit(50)
+        where("groups", "array-contains", selectedGroup)
       );
     }
 
-    const snapshot = await getDocs(q);
+    const usersSnapshot = await getDocs(usersQuery);
     const fetchedUsers: LeaderboardUser[] = [];
-    snapshot.forEach((doc) => {
-      fetchedUsers.push(doc.data() as LeaderboardUser);
+
+    usersSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const uid = data.uid || doc.id;
+      fetchedUsers.push({
+        uid,
+        displayName: data.displayName || "Anonymous",
+        photoURL: data.photoURL || "",
+        weeklyPoints: data.weeklyPoints || 0, 
+        allTimePoints: pointsByUser.get(uid) || 0,
+        currentStreak: data.currentStreak || 0,
+      });
     });
-    setUsers(fetchedUsers);
+
+    // Sort by allTime points descending
+    fetchedUsers.sort((a, b) => b.allTimePoints - a.allTimePoints);
+
+    // Limit to top 50
+    setUsers(fetchedUsers.slice(0, 50));
   };
 
   return (

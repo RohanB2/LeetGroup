@@ -17,10 +17,11 @@ export default function Dashboard() {
   const { user, userData } = useAuth();
   const [activeTab, setActiveTab] = useState<"dashboard" | "leaderboard" | "history" | "groups">("dashboard");
   const [computedWeeklyPoints, setComputedWeeklyPoints] = useState<number | null>(null);
+  const [computedAllTimePoints, setComputedAllTimePoints] = useState<number | null>(null);
 
-  // Compute weekly points from actual submissions
+  // Compute points from actual submissions
   useEffect(() => {
-    const computeWeeklyPoints = async () => {
+    const computePoints = async () => {
       if (!user) return;
 
       const now = new Date();
@@ -28,22 +29,31 @@ export default function Dashboard() {
       const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
       const submissionsRef = collection(db, "submissions");
-      const q = query(
-        submissionsRef,
-        where("userId", "==", user.uid),
-        where("timestamp", ">=", Timestamp.fromDate(weekStart)),
-        where("timestamp", "<=", Timestamp.fromDate(weekEnd))
-      );
+      
+      // We can query all submissions for the user to compute all-time points
+      const qAllTime = query(submissionsRef, where("userId", "==", user.uid));
+      const snapshotAllTime = await getDocs(qAllTime);
+      
+      let allTimeTotal = 0;
+      let weeklyTotal = 0;
 
-      const snapshot = await getDocs(q);
-      let total = 0;
-      snapshot.forEach((doc) => {
-        total += (doc.data().pointsEarned as number) || 0;
+      snapshotAllTime.forEach((doc) => {
+        const data = doc.data();
+        const points = (data.pointsEarned as number) || 0;
+        allTimeTotal += points;
+
+        // Check if the submission is within the current week
+        const subDate = (data.timestamp as Timestamp)?.toDate();
+        if (subDate && subDate >= weekStart && subDate <= weekEnd) {
+          weeklyTotal += points;
+        }
       });
-      setComputedWeeklyPoints(total);
+
+      setComputedAllTimePoints(allTimeTotal);
+      setComputedWeeklyPoints(weeklyTotal);
     };
 
-    computeWeeklyPoints();
+    computePoints();
   }, [user, activeTab]);
 
   const handleSignOut = async () => {
@@ -144,7 +154,7 @@ export default function Dashboard() {
                     <div className="text-xs text-white/50 mt-1 uppercase tracking-wider">Day Streak</div>
                   </div>
                   <div className="col-span-2 bg-white/5 p-4 rounded-xl border border-white/5">
-                    <div className="text-3xl font-bold text-white">{userData?.allTimePoints || 0}</div>
+                    <div className="text-3xl font-bold text-white">{computedAllTimePoints ?? userData?.allTimePoints ?? 0}</div>
                     <div className="text-xs text-white/50 mt-1 uppercase tracking-wider">All-Time Points</div>
                   </div>
                 </div>
