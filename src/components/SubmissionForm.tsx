@@ -64,7 +64,7 @@ export default function SubmissionForm() {
         return;
       }
 
-      // 3. Calculate points
+      // 3. Calculate points to increment cached user score
       const isFirstTimeSolving = existingDocs.empty;
       const pointsEarned = isFirstTimeSolving ? (DIFFICULTY_POINTS[difficulty] || 0) : 0;
 
@@ -76,7 +76,6 @@ export default function SubmissionForm() {
         problemTitle: title,
         difficulty,
         language,
-        pointsEarned,
         timestamp: serverTimestamp(),
       });
 

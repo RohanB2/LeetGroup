@@ -34,20 +34,38 @@ export default function Dashboard() {
       const qAllTime = query(submissionsRef, where("userId", "==", user.uid));
       const snapshotAllTime = await getDocs(qAllTime);
       
-      let allTimeTotal = 0;
-      let weeklyTotal = 0;
+      const DIFFICULTY_POINTS: Record<string, number> = { Easy: 1, Medium: 3, Hard: 5 };
+      const problemFirstSub = new Map<string, { timestamp: Date, points: number }>();
 
       snapshotAllTime.forEach((doc) => {
         const data = doc.data();
-        const points = (data.pointsEarned as number) || 0;
-        allTimeTotal += points;
-
-        // Check if the submission is within the current week
+        const titleSlug = data.titleSlug as string;
+        const difficulty = data.difficulty as string;
         const subDate = (data.timestamp as Timestamp)?.toDate();
-        if (subDate && subDate >= weekStart && subDate <= weekEnd) {
-          weeklyTotal += points;
+        
+        if (!subDate || !titleSlug) return;
+        
+        const points = DIFFICULTY_POINTS[difficulty] || 0;
+
+        if (!problemFirstSub.has(titleSlug)) {
+           problemFirstSub.set(titleSlug, { timestamp: subDate, points });
+        } else {
+           const existing = problemFirstSub.get(titleSlug)!;
+           if (subDate < existing.timestamp) {
+              problemFirstSub.set(titleSlug, { timestamp: subDate, points });
+           }
         }
       });
+      
+      let allTimeTotal = 0;
+      let weeklyTotal = 0;
+      
+      for (const { timestamp, points } of problemFirstSub.values()) {
+        allTimeTotal += points;
+        if (timestamp >= weekStart && timestamp <= weekEnd) {
+           weeklyTotal += points;
+        }
+      }
 
       setComputedAllTimePoints(allTimeTotal);
       setComputedWeeklyPoints(weeklyTotal);

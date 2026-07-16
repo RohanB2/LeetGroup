@@ -77,11 +77,7 @@ export default function Leaderboard() {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        if (timeframe === "weekly") {
-          await fetchWeeklyLeaderboard();
-        } else {
-          await fetchAllTimeLeaderboard();
-        }
+        await fetchLeaderboardData();
       } catch (error: any) {
         console.error("Error fetching leaderboard:", error);
         if (error.message && error.message.includes("requires an index")) {
@@ -95,87 +91,58 @@ export default function Leaderboard() {
     fetchLeaderboard();
   }, [timeframe, selectedGroup]);
 
-  /**
-   * Compute weekly points on-the-fly from submissions.
-   * This avoids the stale `weeklyPoints` counter issue.
-   */
-  const fetchWeeklyLeaderboard = async () => {
+  const fetchLeaderboardData = async () => {
     const now = new Date();
     const weekStart = startOfWeek(now, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
-    // Query all submissions within the current week
-    const submissionsRef = collection(db, "submissions");
-    const subQuery = query(
-      submissionsRef,
-      where("timestamp", ">=", Timestamp.fromDate(weekStart)),
-      where("timestamp", "<=", Timestamp.fromDate(weekEnd))
-    );
-
-    const subSnapshot = await getDocs(subQuery);
-
-    // Group submissions by userId and sum pointsEarned
-    const pointsByUser = new Map<string, number>();
-    subSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const userId = data.userId as string;
-      const points = (data.pointsEarned as number) || 0;
-      pointsByUser.set(userId, (pointsByUser.get(userId) || 0) + points);
-    });
-
-    // Fetch user profiles for all users who have submissions
-    // Also fetch all users to include those with 0 points
-    const usersRef = collection(db, "users");
-    let usersQuery;
-
-    if (selectedGroup === "global") {
-      usersQuery = query(usersRef);
-    } else {
-      usersQuery = query(
-        usersRef,
-        where("groups", "array-contains", selectedGroup)
-      );
-    }
-
-    const usersSnapshot = await getDocs(usersQuery);
-    const fetchedUsers: LeaderboardUser[] = [];
-
-    usersSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const uid = data.uid || doc.id;
-      fetchedUsers.push({
-        uid,
-        displayName: data.displayName || "Anonymous",
-        photoURL: data.photoURL || "",
-        weeklyPoints: pointsByUser.get(uid) || 0,
-        allTimePoints: data.allTimePoints || 0,
-        currentStreak: data.currentStreak || 0,
-      });
-    });
-
-    // Sort by weekly points descending
-    fetchedUsers.sort((a, b) => b.weeklyPoints - a.weeklyPoints);
-
-    // Limit to top 50
-    setUsers(fetchedUsers.slice(0, 50));
-  };
-
-  /**
-   * Compute all-time points on-the-fly from submissions to ensure accuracy.
-   */
-  const fetchAllTimeLeaderboard = async () => {
-    // Query all submissions
     const submissionsRef = collection(db, "submissions");
     const subQuery = query(submissionsRef);
     const subSnapshot = await getDocs(subQuery);
 
-    // Group submissions by userId and sum pointsEarned
-    const pointsByUser = new Map<string, number>();
+    const DIFFICULTY_POINTS: Record<string, number> = { Easy: 1, Medium: 3, Hard: 5 };
+    
+    // Map: userId -> Map<titleSlug, { timestamp: Date, difficulty: string }>
+    const userProblems = new Map<string, Map<string, { timestamp: Date, difficulty: string }>>();
+
     subSnapshot.forEach((doc) => {
       const data = doc.data();
       const userId = data.userId as string;
-      const points = (data.pointsEarned as number) || 0;
-      pointsByUser.set(userId, (pointsByUser.get(userId) || 0) + points);
+      const titleSlug = data.titleSlug as string;
+      const difficulty = data.difficulty as string;
+      const subDate = (data.timestamp as Timestamp)?.toDate();
+      
+      if (!userId || !titleSlug || !subDate || !difficulty) return;
+
+      if (!userProblems.has(userId)) {
+        userProblems.set(userId, new Map());
+      }
+      
+      const userMap = userProblems.get(userId)!;
+      if (!userMap.has(titleSlug)) {
+         userMap.set(titleSlug, { timestamp: subDate, difficulty });
+      } else {
+         const existing = userMap.get(titleSlug)!;
+         if (subDate < existing.timestamp) {
+            userMap.set(titleSlug, { timestamp: subDate, difficulty });
+         }
+      }
+    });
+
+    const userPoints = new Map<string, { allTime: number, weekly: number }>();
+
+    // Calculate points per user
+    userProblems.forEach((problemMap, userId) => {
+      let allTime = 0;
+      let weekly = 0;
+      problemMap.forEach((firstSub, titleSlug) => {
+        const points = DIFFICULTY_POINTS[firstSub.difficulty] || 0;
+        allTime += points;
+        if (firstSub.timestamp >= weekStart && firstSub.timestamp <= weekEnd) {
+          weekly += points;
+        }
+      });
+      userPoints.set(userId, { allTime, weekly });
     });
 
     // Fetch user profiles
@@ -197,18 +164,23 @@ export default function Leaderboard() {
     usersSnapshot.forEach((doc) => {
       const data = doc.data();
       const uid = data.uid || doc.id;
+      const pointsData = userPoints.get(uid) || { allTime: 0, weekly: 0 };
+      
       fetchedUsers.push({
         uid,
         displayName: data.displayName || "Anonymous",
         photoURL: data.photoURL || "",
-        weeklyPoints: data.weeklyPoints || 0, 
-        allTimePoints: pointsByUser.get(uid) || 0,
+        weeklyPoints: pointsData.weekly, 
+        allTimePoints: pointsData.allTime,
         currentStreak: data.currentStreak || 0,
       });
     });
 
-    // Sort by allTime points descending
-    fetchedUsers.sort((a, b) => b.allTimePoints - a.allTimePoints);
+    if (timeframe === "weekly") {
+      fetchedUsers.sort((a, b) => b.weeklyPoints - a.weeklyPoints);
+    } else {
+      fetchedUsers.sort((a, b) => b.allTimePoints - a.allTimePoints);
+    }
 
     // Limit to top 50
     setUsers(fetchedUsers.slice(0, 50));
