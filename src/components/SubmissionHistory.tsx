@@ -271,7 +271,7 @@ export default function SubmissionHistory({ targetUserId, targetUserName, isModa
   };
 
   return (
-    <div className={isModal ? "w-full" : "bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-4xl mx-auto w-full"}>
+    <div className={isModal ? "w-full flex flex-col h-full" : "bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 w-full max-w-7xl mx-auto flex flex-col h-[75vh]"}>
       {!isModal && (
         <h2 className="text-xl font-bold flex items-center gap-2 mb-6 text-white">
           <History className="text-emerald-400" size={22} />
@@ -286,7 +286,7 @@ export default function SubmissionHistory({ targetUserId, targetUserName, isModa
           {targetUserName ? `${targetUserName} hasn't submitted any problems yet.` : "You haven't submitted any problems yet."}
         </div>
       ) : (
-        <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-2xl custom-scrollbar pr-2">
+        <div className="overflow-x-auto flex-1 overflow-y-auto rounded-2xl custom-scrollbar pr-2">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/10">

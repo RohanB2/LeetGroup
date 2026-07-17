@@ -187,7 +187,7 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-4xl mx-auto w-full">
+    <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 w-full max-w-7xl mx-auto flex flex-col h-[75vh]">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-xl font-bold flex items-center gap-2 text-white">
           <Trophy className="text-emerald-400" size={22} />
@@ -266,7 +266,7 @@ export default function Leaderboard() {
       ) : users.length === 0 ? (
         <div className="text-center py-8 text-white/50">No users found in this group.</div>
       ) : (
-        <div className="flex flex-col gap-2 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="flex flex-col gap-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
           {users.map((u, index) => (
             <div
               key={u.uid}

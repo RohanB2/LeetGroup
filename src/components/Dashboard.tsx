@@ -87,7 +87,7 @@ export default function Dashboard() {
     }`;
 
   return (
-    <div className="max-w-[1200px] mx-auto min-h-screen flex flex-col p-4 sm:p-6">
+    <div className="w-[95vw] max-w-[1600px] mx-auto min-h-screen flex flex-col p-4 sm:p-6">
       {/* Navigation */}
       <nav className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl mb-8 flex flex-col sm:flex-row justify-between items-center py-3 px-5 gap-4">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-white">
