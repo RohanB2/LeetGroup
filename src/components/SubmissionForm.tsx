@@ -8,7 +8,7 @@ import { Send, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const LANGUAGES = [
-  "Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "Ruby", "PHP", "Other"
+  "Python", "JavaScript", "Java", "C++", "C", "C#", "Rust", "Swift", "Other"
 ];
 
 const DIFFICULTY_POINTS: Record<string, number> = {
@@ -80,7 +80,8 @@ export default function SubmissionForm() {
       });
 
       // 5. Update user stats
-      const today = new Date().toISOString().split("T")[0];
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const isNewDay = userData.lastSubmissionDate !== today;
       
       const userRef = doc(db, "users", user.uid);
@@ -89,9 +90,12 @@ export default function SubmissionForm() {
       let newStreak = userData.currentStreak;
       if (isNewDay) {
         if (userData.lastSubmissionDate) {
-          const lastDate = new Date(userData.lastSubmissionDate);
-          const current = new Date(today);
-          const diffDays = Math.floor((current.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
+          // Parse dates as local midnight to avoid timezone shifts
+          const lastDate = new Date(userData.lastSubmissionDate + "T00:00:00");
+          const current = new Date(today + "T00:00:00");
+          
+          // Use Math.round to avoid Daylight Savings Time truncation bugs
+          const diffDays = Math.round((current.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
           
           if (diffDays === 1) {
             newStreak += 1;

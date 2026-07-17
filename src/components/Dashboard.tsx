@@ -11,6 +11,7 @@ import Leaderboard from "./Leaderboard";
 import SubmissionHistory from "./SubmissionHistory";
 import ActivityHeatmap from "./ActivityHeatmap";
 import GroupsPanel from "./GroupsPanel";
+import WeeklyResults from "./WeeklyResults";
 import { LogOut, LayoutDashboard, Trophy, History, Users } from "lucide-react";
 
 export default function Dashboard() {
@@ -146,8 +147,8 @@ export default function Dashboard() {
       <main className="flex-1 flex flex-col gap-8">
         {activeTab === "dashboard" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Submit Solution Card */}
-            <div className="md:col-span-2">
+            {/* Submit Solution Card & Weekly Results */}
+            <div className="md:col-span-2 flex flex-col gap-6">
               <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl p-6">
                 <h2 className="text-xl font-bold flex items-center gap-2 mb-6 text-white">
                   <LayoutDashboard size={20} className="text-emerald-400" />
@@ -155,6 +156,8 @@ export default function Dashboard() {
                 </h2>
                 <SubmissionForm />
               </div>
+              
+              <WeeklyResults />
             </div>
 
             {/* Right Column: Stats & Heatmap */}

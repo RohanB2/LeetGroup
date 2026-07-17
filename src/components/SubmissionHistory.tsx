@@ -286,7 +286,7 @@ export default function SubmissionHistory({ targetUserId, targetUserName, isModa
           {targetUserName ? `${targetUserName} hasn't submitted any problems yet.` : "You haven't submitted any problems yet."}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl">
+        <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-2xl custom-scrollbar pr-2">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/10">

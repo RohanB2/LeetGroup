@@ -266,7 +266,7 @@ export default function Leaderboard() {
       ) : users.length === 0 ? (
         <div className="text-center py-8 text-white/50">No users found in this group.</div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar">
           {users.map((u, index) => (
             <div
               key={u.uid}

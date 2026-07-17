@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { Users, Plus, Mail, Check, X, Loader2, User as UserIcon, Crown } from "lucide-react";
+import { Users, Plus, Mail, Check, X, Loader2, User as UserIcon, Crown, UserMinus } from "lucide-react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -252,23 +252,42 @@ export default function GroupsPanel() {
     }
   };
 
-  const handlePromoteLeader = async (groupId: string, newOwnerId: string) => {
+  const handleKickMember = async (groupId: string, memberId: string) => {
     if (!user || !userData) return;
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, "groups", groupId), {
-        ownerId: newOwnerId
-      });
-      setMessage({ type: 'success', text: 'Promoted to leader successfully.' });
-      
-      if (viewingGroup && viewingGroup.id === groupId) {
-        setViewingGroup({ ...viewingGroup, ownerId: newOwnerId });
+      // Remove member from group
+      const groupDoc = await getDoc(doc(db, "groups", groupId));
+      if (groupDoc.exists()) {
+        const members = groupDoc.data().members || [];
+        await updateDoc(doc(db, "groups", groupId), {
+          members: members.filter((m: string) => m !== memberId)
+        });
       }
       
+      // Remove group from user
+      const uDoc = await getDoc(doc(db, "users", memberId));
+      if (uDoc.exists()) {
+        const uGroups = uDoc.data().groups || [];
+        await updateDoc(doc(db, "users", memberId), {
+          groups: uGroups.filter((g: string) => g !== groupId)
+        });
+      }
+      
+      setMessage({ type: 'success', text: 'Member kicked successfully.' });
+      
+      // Update local members list
+      setGroupMembers(prev => prev.filter(m => m.uid !== memberId));
+      
+      // Also update the viewingGroup local state
+      if (viewingGroup && viewingGroup.id === groupId) {
+         setViewingGroup({ ...viewingGroup, members: viewingGroup.members?.filter(m => m !== memberId) });
+      }
+
       fetchData();
     } catch (err) {
       console.error(err);
-      setMessage({ type: 'error', text: 'Failed to promote leader.' });
+      setMessage({ type: 'error', text: 'Failed to kick member.' });
     } finally {
       setActionLoading(false);
     }
@@ -550,12 +569,12 @@ export default function GroupsPanel() {
                   
                   {user?.uid === viewingGroup?.ownerId && member.uid !== viewingGroup?.ownerId && (
                     <button 
-                      onClick={() => handlePromoteLeader(viewingGroup!.id, member.uid)}
+                      onClick={() => handleKickMember(viewingGroup!.id, member.uid)}
                       disabled={actionLoading}
-                      className="text-xs px-2.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 rounded-md transition disabled:opacity-50 flex items-center gap-1"
+                      className="text-xs px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-md transition disabled:opacity-50 flex items-center gap-1"
                     >
-                      <Crown size={12} />
-                      Promote
+                      <UserMinus size={12} />
+                      Kick
                     </button>
                   )}
                 </div>

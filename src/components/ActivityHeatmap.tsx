@@ -33,17 +33,25 @@ export default function ActivityHeatmap() {
         );
         
         const snapshot = await getDocs(q);
-        const counts: Record<string, number> = {};
+        const dailyUniqueProblems: Record<string, Set<string>> = {};
         
         snapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.timestamp) {
+          if (data.timestamp && data.titleSlug) {
             const dateStr = format(data.timestamp.toDate(), 'yyyy-MM-dd');
-            counts[dateStr] = (counts[dateStr] || 0) + 1;
+            if (!dailyUniqueProblems[dateStr]) {
+              dailyUniqueProblems[dateStr] = new Set<string>();
+            }
+            dailyUniqueProblems[dateStr].add(data.titleSlug);
           }
         });
         
-        setActivityData(counts);
+        const finalCounts: Record<string, number> = {};
+        for (const dateStr in dailyUniqueProblems) {
+          finalCounts[dateStr] = dailyUniqueProblems[dateStr].size;
+        }
+        
+        setActivityData(finalCounts);
       } catch (error) {
         console.error("Error fetching activity data:", error);
       } finally {
