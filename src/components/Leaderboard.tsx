@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, startOfWeek, endOfWeek, formatDistanceToNowStrict } from "date-fns";
 import SubmissionHistory from "./SubmissionHistory";
+import { getValidStreak } from "@/lib/utils";
 
 interface LeaderboardUser {
   uid: string;
@@ -17,6 +18,7 @@ interface LeaderboardUser {
   weeklyPoints: number;
   allTimePoints: number;
   currentStreak: number;
+  lastSubmissionDate?: string;
 }
 
 interface Group {
@@ -173,6 +175,7 @@ export default function Leaderboard() {
         weeklyPoints: pointsData.weekly, 
         allTimePoints: pointsData.allTime,
         currentStreak: data.currentStreak || 0,
+        lastSubmissionDate: data.lastSubmissionDate,
       });
     });
 
@@ -292,7 +295,14 @@ export default function Leaderboard() {
                 <div>
                   <div className="font-semibold text-white">{u.displayName}</div>
                   <div className="text-xs text-white/40 flex items-center gap-1">
-                    <span className="text-orange-400 font-medium">🔥 {u.currentStreak} day streak</span>
+                    {(() => {
+                      const validStreak = getValidStreak(u.currentStreak, u.lastSubmissionDate);
+                      return (
+                        <span className={`${validStreak > 0 ? "text-orange-400" : "text-white/40"} font-medium`}>
+                          {validStreak > 0 ? "🔥 " : ""}{validStreak} day streak
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -311,7 +321,7 @@ export default function Leaderboard() {
       <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
         <DialogContent className="bg-neutral-900 border-white/10 text-white rounded-2xl sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedUser?.displayName}&apos;s History</DialogTitle>
+            <DialogTitle>{selectedUser?.displayName}&apos;s Recent History</DialogTitle>
           </DialogHeader>
           {selectedUser && (
             <SubmissionHistory targetUserId={selectedUser.uid} targetUserName={selectedUser.displayName} isModal={true} />

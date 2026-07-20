@@ -177,7 +177,11 @@ export default function SubmissionHistory({ targetUserId, targetUserName, isModa
         }
       });
       
-      setGroupedSubmissions(Array.from(groupMap.values()));
+      let finalGroups = Array.from(groupMap.values());
+      if (isModal) {
+        finalGroups = finalGroups.slice(0, 6);
+      }
+      setGroupedSubmissions(finalGroups);
     } catch (error) {
       console.error("Error fetching history:", error);
     } finally {

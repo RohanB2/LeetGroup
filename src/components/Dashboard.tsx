@@ -13,6 +13,7 @@ import ActivityHeatmap from "./ActivityHeatmap";
 import GroupsPanel from "./GroupsPanel";
 import WeeklyResults from "./WeeklyResults";
 import { LogOut, LayoutDashboard, Trophy, History, Users } from "lucide-react";
+import { getValidStreak } from "@/lib/utils";
 
 export default function Dashboard() {
   const { user, userData } = useAuth();
@@ -171,7 +172,14 @@ export default function Dashboard() {
                     <div className="text-xs text-white/50 mt-1 uppercase tracking-wider">Weekly Points</div>
                   </div>
                   <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                    <div className="text-3xl font-bold text-orange-400">{userData?.currentStreak || 0}</div>
+                    {(() => {
+                      const validStreak = getValidStreak(userData?.currentStreak, userData?.lastSubmissionDate);
+                      return (
+                        <div className={`text-3xl font-bold ${validStreak > 0 ? "text-orange-400" : "text-white/40"}`}>
+                          {validStreak > 0 ? "🔥 " : ""}{validStreak}
+                        </div>
+                      );
+                    })()}
                     <div className="text-xs text-white/50 mt-1 uppercase tracking-wider">Day Streak</div>
                   </div>
                   <div className="col-span-2 bg-white/5 p-4 rounded-xl border border-white/5">

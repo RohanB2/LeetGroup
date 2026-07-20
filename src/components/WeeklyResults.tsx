@@ -45,21 +45,30 @@ export default function WeeklyResults() {
 
         // 2. Fetch Past Weeks from weekly_results collection
         const pastResultsRef = collection(db, "weekly_results");
-        const pastQuery = query(pastResultsRef, orderBy("weekStart", "desc"), limit(10));
+        const pastQuery = query(pastResultsRef, orderBy("timestamp", "desc"), limit(10));
         const pastSnapshot = await getDocs(pastQuery);
 
         pastSnapshot.forEach((doc) => {
           const data = doc.data();
-          const start = (data.weekStart as Timestamp)?.toDate();
-          const end = (data.weekEnd as Timestamp)?.toDate();
+          // Safely parse timestamps or date strings
+          let timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp ? new Date(data.timestamp) : null);
+          let start = data.weekStart?.toDate ? data.weekStart.toDate() : (data.weekStart ? new Date(data.weekStart) : null);
+          let end = data.weekEnd?.toDate ? data.weekEnd.toDate() : (data.weekEnd ? new Date(data.weekEnd) : null);
+          
+          if (!start && timestamp) {
+             start = startOfWeek(timestamp, { weekStartsOn: 0 });
+          }
+          if (!end && timestamp) {
+             end = endOfWeek(timestamp, { weekStartsOn: 0 });
+          }
           
           if (start && end) {
             combinedResults.push({
               id: doc.id,
               isCurrentWeek: false,
               dateLabel: `${format(start, "MMM do")} — ${format(end, "MMM do")}`,
-              winner: data.winner as WeeklyResultUser || null,
-              loser: data.loser as WeeklyResultUser || null,
+              winner: data.winnerName ? { uid: data.winnerId, displayName: data.winnerName, photoURL: "", points: data.winnerPoints } : null,
+              loser: data.loserName ? { uid: data.loserId, displayName: data.loserName, photoURL: "", points: data.loserPoints } : null,
             });
           }
         });
@@ -185,9 +194,10 @@ export default function WeeklyResults() {
       {/* Header & Navigation */}
       <div className="flex items-center justify-between mb-4 relative z-10">
         <button 
+          type="button"
           onClick={handlePrev}
           disabled={results.length <= 1}
-          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors disabled:opacity-30"
+          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={20} />
         </button>
@@ -198,9 +208,10 @@ export default function WeeklyResults() {
         </div>
 
         <button 
+          type="button"
           onClick={handleNext}
           disabled={results.length <= 1}
-          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors disabled:opacity-30"
+          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronRight size={20} />
         </button>
@@ -252,6 +263,7 @@ export default function WeeklyResults() {
           {results.map((_, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => setCurrentIndex(idx)}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 idx === currentIndex ? "w-6 bg-emerald-500" : "w-1.5 bg-white/20 hover:bg-white/40"

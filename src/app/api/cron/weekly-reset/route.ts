@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, writeBatch, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { startOfWeek, endOfWeek } from "date-fns";
 
 export async function GET(req: Request) {
   try {
@@ -31,9 +32,16 @@ export async function GET(req: Request) {
     const winner = users[0];
     const loser = users[users.length - 1];
 
+    // Calculate the week that just ended
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
     // Log the result
     await addDoc(collection(db, "weekly_results"), {
       timestamp: serverTimestamp(),
+      weekStart: Timestamp.fromDate(weekStart),
+      weekEnd: Timestamp.fromDate(weekEnd),
       winnerId: winner.id,
       winnerName: winner.displayName,
       winnerPoints: winner.weeklyPoints,

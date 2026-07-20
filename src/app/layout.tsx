@@ -7,7 +7,7 @@ import Background from "@/components/Background";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "LeetCode Accountability Tracker",
+  title: "LeetGroup",
   description: "Track LeetCode progress with friends",
 };
 
