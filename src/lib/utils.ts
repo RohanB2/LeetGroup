@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function getValidStreak(currentStreak: number | undefined, lastSubmissionDate: string | undefined): number {
+export function getValidStreak(currentStreak: number | undefined | null, lastSubmissionDate: string | undefined | null): number {
   if (!currentStreak || !lastSubmissionDate) return 0;
 
   const d = new Date();
